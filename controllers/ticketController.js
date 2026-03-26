@@ -75,6 +75,17 @@ exports.getTickets = async (req, res) => {
     }
 };
 
+// GET /api/tickets/types
+exports.getTicketTypes = async (req, res) => {
+    try {
+        const types = await Ticket.getTicketTypes();
+        res.json({ success: true, count: types.length, data: types });
+    } catch (error) {
+        console.error('Error fetching ticket types:', error);
+        res.status(500).json({ success: false, error: 'Failed to retrieve ticket types' });
+    }
+};
+
 // GET /api/tickets/stats
 exports.getStats = async (req, res) => {
     try {

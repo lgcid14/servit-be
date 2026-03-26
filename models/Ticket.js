@@ -150,6 +150,11 @@ class Ticket {
         return result.rows;
     }
 
+    static async getTicketTypes() {
+        const result = await pool.query('SELECT id, type, description FROM ticket_types ORDER BY id ASC');
+        return result.rows;
+    }
+
     static async getStats() {
         // Query multiple metrics in parallel from DB
         const queries = {
