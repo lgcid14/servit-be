@@ -27,12 +27,13 @@ class Ticket {
             survey_sent: false,
             channel: 'web',
             category: data.category || data.type || 'General',
-            sheet_data: data.sheet_data || data.sheetData || {}
+            sheet_data: data.sheet_data || data.sheetData || {},
+            ticket_type_id: data.ticket_type_id || null
         };
 
         const sql = `
-            INSERT INTO tickets (id, display_id, created_at, rut, email, type, category_id, subtype, status, details, payload, priority, category, sheet_data)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            INSERT INTO tickets (id, display_id, created_at, rut, email, type, category_id, subtype, status, details, payload, priority, category, sheet_data, ticket_type_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         `;
 
         const finalPayload = typeof newTicket.payload === 'string' ? newTicket.payload : JSON.stringify(newTicket.payload || {});
@@ -42,7 +43,7 @@ class Ticket {
             newTicket.id, newTicket.display_id, newTicket.created_at, newTicket.rut, 
             newTicket.email, newTicket.type, newTicket.category_id, newTicket.subtype, newTicket.status, 
             newTicket.details, finalPayload, newTicket.priority,
-            newTicket.category, finalSheetData
+            newTicket.category, finalSheetData, newTicket.ticket_type_id
         ];
 
         await pool.query(sql, vals);

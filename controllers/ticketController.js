@@ -2,7 +2,9 @@ const axios = require('axios');
 const Ticket = require('../models/Ticket');
 const n8nService = require('../services/n8nService');
 const outlookService = require('../services/outlookService');
+const OutlookService = require('../services/outlookService');
 const ExcelJS = require('exceljs');
+const { pool } = require('../config/db');
 
 // POST /api/tickets
 exports.createTicket = async (req, res) => {
@@ -10,11 +12,20 @@ exports.createTicket = async (req, res) => {
         const payload = req.body;
 
 
+        // Validate ticket_type_id if provided
+        if (payload.ticket_type_id) {
+            const typeCheck = await pool.query('SELECT id FROM ticket_types WHERE id = $1', [payload.ticket_type_id]);
+            if (typeCheck.rowCount === 0) {
+                return res.status(400).json({ success: false, error: 'Ticket type id does not exist' });
+            }
+        }
+
         // Abstract the specific request parsing. The frontend sends structured data.
         const ticketData = {
             rut: payload.rut,
             correo: payload.correo,
             category_id: payload.category_id,
+            ticket_type_id: payload.ticket_type_id,
             type: payload.type, // Human label of category
             details: payload.details,
             payload: payload.dynamicData, // Dynamic fields values: { "Nombre": "Juan", ... }
@@ -111,7 +122,7 @@ exports.updateTicketStatus = async (req, res) => {
         if (oldTicket && oldTicket.status !== status) {
             n8nService.sendTicketStatusChanged(ticket.id, oldTicket.status, status)
                 .catch(err => console.warn('[n8n] Could not send status change event:', err.message));
-                
+
             // Trigger dedicated resolved email immediately via our direct Outlook integration
             if (status === 'resuelto') {
                 outlookService.sendTicketResolvedEmail(ticket)
@@ -140,7 +151,7 @@ exports.replyTicket = async (req, res) => {
         // Trigger n8n async for email dispatch (fire-and-forget, never blocks)
         n8nService.sendTicketReply(ticket.id, message, agentName, ticket.email || ticket.correo)
             .catch(err => console.warn('[n8n] Could not send reply event:', err.message));
-        
+
         // Priority trigger: Real Outlook Enterprise mail (also fire-and-forget)
         outlookService.sendTicketResponse(ticket, message)
             .catch(err => console.warn('[Outlook] Could not send email:', err.message));
@@ -157,7 +168,7 @@ exports.generateAiSuggestion = async (req, res) => {
     try {
         const ticketId = req.params.id;
         const ticket = await Ticket.findById(ticketId);
-        
+
         if (!ticket) {
             return res.status(404).json({ success: false, error: 'Ticket not found' });
         }
@@ -165,9 +176,9 @@ exports.generateAiSuggestion = async (req, res) => {
         // Call the local n8n webhook specifically designed for AI Keta 
         // This expects the user to have a workflow listening on this URL
         const n8nAiWebhookUrl = 'http://localhost:5678/webhook/ai-suggest';
-        
+
         console.log(`Requesting AI suggestion from Keta via n8n: ${n8nAiWebhookUrl}`);
-        
+
         // Optional timeout so the frontend doesn't hang forever if n8n is offline or slow
         const response = await axios.post(n8nAiWebhookUrl, {
             ticketId: ticket.id,
@@ -182,19 +193,19 @@ exports.generateAiSuggestion = async (req, res) => {
         const suggestion = response.data?.suggestion || response.data?.content || "El asistente Keta no retornó un mensaje claro. Por favor revisa la configuración del nodo de respuesta en n8n.";
         const sources = response.data?.sources || response.data?.internetSearch || "No se especificaron fuentes de búsqueda.";
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             data: {
                 content: suggestion,
                 internetSearch: sources
-            } 
+            }
         });
 
     } catch (error) {
         console.error('Error contacting n8n for AI suggestion:', error.message);
         // Provide a graceful fallback error instead of crashing the UI
-        res.json({ 
-            success: false, 
+        res.json({
+            success: false,
             error: 'No se pudo contactar al agente IA Keta en n8n.',
             data: {
                 content: "Hubo un error de conexión con n8n alojado localmente. Asegúrate de que el flujo de Keta esté activo y el Webhook sea accesible.",
@@ -218,7 +229,7 @@ exports.getTicketHistory = async (req, res) => {
 exports.exportTickets = async (req, res) => {
     try {
         const tickets = await Ticket.findAll(); // Get all tickets for export
-        
+
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Tickets');
 
