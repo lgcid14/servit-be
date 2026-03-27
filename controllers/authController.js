@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { UserRepo } = require('../models/Repository');
 
 exports.login = async (req, res) => {
@@ -29,15 +30,19 @@ exports.login = async (req, res) => {
         // Return user data (excluding password_hash)
         const { password_hash, ...userData } = user;
         
-        // For simplicity, we return a fake token as before, but linked to real DB user
+        const jwtSecret = process.env.JWT_SECRET || 'servit-super-secret-key';
+        const token = jwt.sign(
+            { id: userData.id, role_id: userData.role_id || userData.role },
+            jwtSecret,
+            { expiresIn: '24h' }
+        );
+
         res.json({ 
             success: true, 
-            token: 'authenticated-session-token', 
+            token: token, 
             user: {
                 id: userData.id,
-                name: userData.name,
-                email: userData.email,
-                role: userData.role
+                roleId: userData.role_id || userData.role
             }
         });
     } catch (error) {
