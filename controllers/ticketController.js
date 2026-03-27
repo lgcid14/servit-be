@@ -11,6 +11,11 @@ exports.createTicket = async (req, res) => {
     try {
         const payload = req.body;
 
+        // Validate title
+        if (!payload.tittle || !payload.tittle.trim()) {
+            return res.status(400).json({ success: false, error: 'El título (tittle) es obligatorio' });
+        }
+
 
         // Validate ticket_type_id if provided
         if (payload.ticket_type_id) {
@@ -22,6 +27,7 @@ exports.createTicket = async (req, res) => {
 
         // Abstract the specific request parsing. The frontend sends structured data.
         const ticketData = {
+            tittle: payload.tittle,
             rut: payload.rut,
             correo: payload.correo,
             category_id: payload.category_id,

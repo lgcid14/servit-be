@@ -15,6 +15,7 @@ class Ticket {
             id,
             display_id,
             created_at: new Date().toISOString(),
+            tittle: data.tittle,
             rut: data.rut,
             email: data.correo || data.email,
             type: data.type,
@@ -32,8 +33,8 @@ class Ticket {
         };
 
         const sql = `
-            INSERT INTO tickets (id, display_id, created_at, rut, email, type, category_id, subtype, status, details, payload, priority, category, sheet_data, ticket_type_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            INSERT INTO tickets (id, display_id, created_at, rut, email, type, category_id, subtype, status, details, payload, priority, category, sheet_data, ticket_type_id, tittle)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         `;
 
         const finalPayload = typeof newTicket.payload === 'string' ? newTicket.payload : JSON.stringify(newTicket.payload || {});
@@ -43,7 +44,7 @@ class Ticket {
             newTicket.id, newTicket.display_id, newTicket.created_at, newTicket.rut, 
             newTicket.email, newTicket.type, newTicket.category_id, newTicket.subtype, newTicket.status, 
             newTicket.details, finalPayload, newTicket.priority,
-            newTicket.category, finalSheetData, newTicket.ticket_type_id
+            newTicket.category, finalSheetData, newTicket.ticket_type_id, newTicket.tittle
         ];
 
         await pool.query(sql, vals);
