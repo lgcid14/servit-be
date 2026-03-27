@@ -16,8 +16,8 @@ class Ticket {
             display_id,
             created_at: new Date().toISOString(),
             tittle: data.tittle,
-            rut: data.rut,
-            email: data.correo || data.email,
+            reporter_id: data.reporter_id || null,
+            owner_id: data.owner_id || null,
             type: data.type,
             category_id: data.category_id || null,
             subtype: data.subtype || null,
@@ -33,7 +33,7 @@ class Ticket {
         };
 
         const sql = `
-            INSERT INTO tickets (id, display_id, created_at, rut, email, type, category_id, subtype, status, details, payload, priority, category, sheet_data, ticket_type_id, tittle)
+            INSERT INTO tickets (id, display_id, created_at, reporter_id, owner_id, type, category_id, subtype, status, details, payload, priority, category, sheet_data, ticket_type_id, tittle)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         `;
 
@@ -41,8 +41,8 @@ class Ticket {
         const finalSheetData = typeof newTicket.sheet_data === 'string' ? newTicket.sheet_data : JSON.stringify(newTicket.sheet_data || {});
 
         const vals = [
-            newTicket.id, newTicket.display_id, newTicket.created_at, newTicket.rut, 
-            newTicket.email, newTicket.type, newTicket.category_id, newTicket.subtype, newTicket.status, 
+            newTicket.id, newTicket.display_id, newTicket.created_at, newTicket.reporter_id, 
+            newTicket.owner_id, newTicket.type, newTicket.category_id, newTicket.subtype, newTicket.status, 
             newTicket.details, finalPayload, newTicket.priority,
             newTicket.category, finalSheetData, newTicket.ticket_type_id, newTicket.tittle
         ];

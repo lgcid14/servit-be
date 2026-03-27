@@ -28,8 +28,8 @@ exports.createTicket = async (req, res) => {
         // Abstract the specific request parsing. The frontend sends structured data.
         const ticketData = {
             tittle: payload.tittle,
-            rut: payload.rut,
-            correo: payload.correo,
+            reporter_id: payload.reporter_id,
+            owner_id: payload.owner_id,
             category_id: payload.category_id,
             ticket_type_id: payload.ticket_type_id,
             type: payload.type, // Human label of category
