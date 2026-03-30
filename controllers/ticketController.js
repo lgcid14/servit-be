@@ -12,8 +12,8 @@ exports.createTicket = async (req, res) => {
         const payload = req.body;
 
         // Validate title
-        if (!payload.tittle || !payload.tittle.trim()) {
-            return res.status(400).json({ success: false, error: 'El título (tittle) es obligatorio' });
+        if (!payload.title || !payload.title.trim()) {
+            return res.status(400).json({ success: false, error: 'El título (title) es obligatorio' });
         }
 
 
@@ -27,7 +27,7 @@ exports.createTicket = async (req, res) => {
 
         // Abstract the specific request parsing. The frontend sends structured data.
         const ticketData = {
-            tittle: payload.tittle,
+            title: payload.title,
             reporter_id: payload.reporter_id,
             owner_id: payload.owner_id,
             category_id: payload.category_id,
