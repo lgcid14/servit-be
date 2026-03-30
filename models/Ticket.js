@@ -17,7 +17,7 @@ class Ticket {
             created_at: new Date().toISOString(),
             title: data.title,
             reporter_id: data.reporter_id || null,
-            owner_id: data.owner_id || null,
+            ownerId: data.owner_id || null,
             type: data.type,
             category_id: data.category_id || null,
             subtype: data.subtype || null,
@@ -42,7 +42,7 @@ class Ticket {
 
         const vals = [
             newTicket.id, newTicket.display_id, newTicket.created_at, newTicket.reporter_id,
-            newTicket.owner_id, newTicket.type, newTicket.category_id, newTicket.subtype, newTicket.status_id,
+            newTicket.ownerId, newTicket.type, newTicket.category_id, newTicket.subtype, newTicket.status_id,
             newTicket.details, finalPayload, newTicket.priority,
             newTicket.category, finalSheetData, newTicket.ticket_type_id, newTicket.title
         ];
@@ -66,6 +66,7 @@ class Ticket {
         let query = `
             SELECT 
                 t.*, 
+                t.owner_id AS "ownerId",
                 u.email, 
                 tt.type as ticket_type,
                 ts.status_name as status,
@@ -108,6 +109,7 @@ class Ticket {
         const query = `
             SELECT 
                 t.*, 
+                t.owner_id AS "ownerId",
                 u.email, 
                 tt.type as ticket_type,
                 ts.status_name as status,

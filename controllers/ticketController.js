@@ -29,7 +29,7 @@ exports.createTicket = async (req, res) => {
         const ticketData = {
             title: payload.title,
             reporter_id: payload.reporter_id,
-            owner_id: payload.owner_id,
+            ownerId: payload.ownerId,
             category_id: payload.category_id,
             ticket_type_id: payload.ticket_type_id,
             type: payload.type, // Human label of category
@@ -156,14 +156,14 @@ exports.updateTicketStatus = async (req, res) => {
 // PATCH /api/tickets/:id
 exports.updateTicket = async (req, res) => {
     try {
-        const { status, owner_id, notes, userId } = req.body;
+        const { status, ownerId, notes, userId } = req.body;
         const agentName = userId || 'Admin';
         const id = req.params.id;
 
         const oldTicket = await Ticket.findById(id);
         if (!oldTicket) return res.status(404).json({ success: false, error: 'Ticket not found' });
 
-        const ticket = await Ticket.update(id, { status, owner_id, notes }, agentName);
+        const ticket = await Ticket.update(id, { status, owner_id: ownerId, notes }, agentName);
 
         // Trigger notifications if status changed
         if (status && oldTicket.status !== status) {
