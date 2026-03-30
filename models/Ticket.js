@@ -5,7 +5,7 @@ const { pool } = require('../config/db');
 class Ticket {
     static async create(data) {
         const id = uuidv4();
-        
+
         // Get next value from sequence for display_id
         const seqRes = await pool.query("SELECT nextval('ticket_id_seq')");
         const seqNum = seqRes.rows[0].nextval;
@@ -23,7 +23,7 @@ class Ticket {
             subtype: data.subtype || null,
             status: 'Recibido',
             details: data.details,
-            payload: data.payload, 
+            payload: data.payload,
             priority: 'Normal',
             survey_sent: false,
             channel: 'web',
@@ -41,8 +41,8 @@ class Ticket {
         const finalSheetData = typeof newTicket.sheet_data === 'string' ? newTicket.sheet_data : JSON.stringify(newTicket.sheet_data || {});
 
         const vals = [
-            newTicket.id, newTicket.display_id, newTicket.created_at, newTicket.reporter_id, 
-            newTicket.owner_id, newTicket.type, newTicket.category_id, newTicket.subtype, newTicket.status, 
+            newTicket.id, newTicket.display_id, newTicket.created_at, newTicket.reporter_id,
+            newTicket.owner_id, newTicket.type, newTicket.category_id, newTicket.subtype, newTicket.status,
             newTicket.details, finalPayload, newTicket.priority,
             newTicket.category, finalSheetData, newTicket.ticket_type_id, newTicket.title
         ];
@@ -63,21 +63,30 @@ class Ticket {
     }
 
     static async findAll(filters) {
-        let query = 'SELECT * FROM tickets';
+        let query = `
+            SELECT 
+                t.*, 
+                u.email, 
+                tt.type as ticket_type,
+                TO_CHAR(t.created_at, 'DD-MM-YYYY HH24:MI') as "creationDate"
+            FROM tickets t
+            LEFT JOIN users u ON t.reporter_id = u.id
+            LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.id
+        `;
         let vals = [];
         let clauses = [];
 
         if (filters) {
             if (filters.status) {
-                clauses.push(`status = $${vals.length + 1}`);
+                clauses.push(`t.status = $${vals.length + 1}`);
                 vals.push(filters.status);
             }
             if (filters.type) {
-                clauses.push(`type = $${vals.length + 1}`);
+                clauses.push(`tt.type = $${vals.length + 1}`);
                 vals.push(filters.type);
             }
             if (filters.rut) {
-                clauses.push(`rut = $${vals.length + 1}`);
+                clauses.push(`u.rut = $${vals.length + 1}`);
                 vals.push(filters.rut);
             }
         }
@@ -86,7 +95,7 @@ class Ticket {
             query += ' WHERE ' + clauses.join(' AND ');
         }
 
-        query += ' ORDER BY created_at DESC';
+        query += ' ORDER BY t.created_at DESC';
 
         const result = await pool.query(query, vals);
         return result.rows;
@@ -126,7 +135,7 @@ class Ticket {
                 message: replyData.message,
                 created_at: new Date().toISOString()
             };
-            
+
             await pool.query(
                 'INSERT INTO replies (id, ticket_id, agent, message, created_at) VALUES ($1, $2, $3, $4, $5)',
                 [reply.id, reply.ticket_id, reply.agent, reply.message, reply.created_at]
@@ -194,7 +203,7 @@ class Ticket {
             GROUP BY TO_CHAR(created_at, 'DD/MM'), date
             ORDER BY MIN(created_at) ASC
         `;
-        
+
         // Categorical breakdown
         const catSql = `
             SELECT category, COUNT(*) as count 
