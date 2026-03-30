@@ -153,6 +153,36 @@ exports.updateTicketStatus = async (req, res) => {
     }
 };
 
+// PATCH /api/tickets/:id
+exports.updateTicket = async (req, res) => {
+    try {
+        const { status, owner_id, notes, userId } = req.body;
+        const agentName = userId || 'Admin';
+        const id = req.params.id;
+
+        const oldTicket = await Ticket.findById(id);
+        if (!oldTicket) return res.status(404).json({ success: false, error: 'Ticket not found' });
+
+        const ticket = await Ticket.update(id, { status, owner_id, notes }, agentName);
+
+        // Trigger notifications if status changed
+        if (status && oldTicket.status !== status) {
+            n8nService.sendTicketStatusChanged(ticket.id, oldTicket.status, status)
+                .catch(err => console.warn('[n8n] Could not send status change event:', err.message));
+
+            if (status === 'resuelto') {
+                outlookService.sendTicketResolvedEmail(ticket)
+                    .catch(err => console.warn('[Outlook] Could not send resolved email:', err.message));
+            }
+        }
+
+        res.json({ success: true, data: ticket });
+    } catch (error) {
+        console.error('Error updating ticket:', error);
+        res.status(500).json({ success: false, error: 'Failed to update ticket' });
+    }
+};
+
 // POST /api/tickets/:id/reply
 exports.replyTicket = async (req, res) => {
     try {

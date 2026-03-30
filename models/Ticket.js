@@ -69,7 +69,8 @@ class Ticket {
                 u.email, 
                 tt.type as ticket_type,
                 ts.status_name as status,
-                TO_CHAR(t.created_at, 'DD-MM-YYYY HH24:MI') as "creationDate"
+                TO_CHAR(t.created_at, 'DD-MM-YYYY HH24:MI') as "creationDate",
+                t.notes
             FROM tickets t
             LEFT JOIN users u ON t.reporter_id = u.id
             LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.id
@@ -110,7 +111,8 @@ class Ticket {
                 u.email, 
                 tt.type as ticket_type,
                 ts.status_name as status,
-                TO_CHAR(t.created_at, 'DD-MM-YYYY HH24:MI') as "creationDate"
+                TO_CHAR(t.created_at, 'DD-MM-YYYY HH24:MI') as "creationDate",
+                t.notes
             FROM tickets t
             LEFT JOIN users u ON t.reporter_id = u.id
             LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.id
@@ -127,28 +129,51 @@ class Ticket {
         return ticket;
     }
 
-    static async updateStatus(id, newStatusName, agent = 'Admin') {
-        const statusRes = await pool.query('SELECT id FROM ticket_statuses WHERE status_name = $1', [newStatusName]);
-        const status_id = statusRes.rows[0]?.id;
+    static async update(id, data, agent = 'Admin') {
+        const updateData = {};
+        const logs = [];
 
-        if (!status_id) {
-            throw new Error(`Status '${newStatusName}' not found`);
+        if (data.status) {
+            const statusRes = await pool.query('SELECT id FROM ticket_statuses WHERE status_name = $1', [data.status]);
+            const status_id = statusRes.rows[0]?.id;
+            if (status_id) {
+                updateData.status_id = status_id;
+                logs.push(`Estado cambiado a ${data.status}`);
+            }
         }
 
-        const updated = await TicketRepo.update(id, { status_id });
-        if (updated) {
+        if (data.owner_id !== undefined) {
+            updateData.owner_id = data.owner_id;
+            logs.push(data.owner_id ? `Responsable asignado` : 'Responsable removido');
+        }
+
+        if (data.notes !== undefined) {
+            updateData.notes = data.notes;
+            logs.push('Observaciones actualizadas');
+        }
+
+        if (Object.keys(updateData).length === 0) return await this.findById(id);
+
+        // Add updated_at
+        updateData.updated_at = new Date().toISOString();
+
+        const updated = await TicketRepo.update(id, updateData);
+        if (updated && logs.length > 0) {
             await LogRepo.insert({
                 id: uuidv4(),
                 ticket_id: id,
-                action: 'STATUS_CHANGED',
-                details: `Estado cambiado a ${newStatusName}`,
+                action: 'TICKET_UPDATED',
+                details: logs.join(', '),
                 agent,
                 created_at: new Date().toISOString()
             });
-            // Return full joined object
-            return await this.findById(id);
         }
-        return null;
+
+        return await this.findById(id);
+    }
+
+    static async updateStatus(id, newStatusName, agent = 'Admin') {
+        return await this.update(id, { status: newStatusName }, agent);
     }
 
     static async addReply(id, replyData) {

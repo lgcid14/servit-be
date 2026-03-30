@@ -26,6 +26,9 @@ router.post('/', ticketController.createTicket);
 // Update ticket status
 router.patch('/:id/status', ticketController.updateTicketStatus);
 
+// Update ticket (general)
+router.patch('/:id', ticketController.updateTicket);
+
 // Generate AI Reply Suggestion via n8n
 router.post('/:id/ai-suggest', ticketController.generateAiSuggestion);
 
