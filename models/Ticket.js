@@ -21,7 +21,7 @@ class Ticket {
             type: data.type,
             category_id: data.category_id || null,
             subtype: data.subtype || null,
-            status: 'Recibido',
+            status_id: 1,
             details: data.details,
             payload: data.payload,
             priority: 'Normal',
@@ -33,7 +33,7 @@ class Ticket {
         };
 
         const sql = `
-            INSERT INTO tickets (id, display_id, created_at, reporter_id, owner_id, type, category_id, subtype, status, details, payload, priority, category, sheet_data, ticket_type_id, title)
+            INSERT INTO tickets (id, display_id, created_at, reporter_id, owner_id, type, category_id, subtype, status_id, details, payload, priority, category, sheet_data, ticket_type_id, title)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
         `;
 
@@ -42,7 +42,7 @@ class Ticket {
 
         const vals = [
             newTicket.id, newTicket.display_id, newTicket.created_at, newTicket.reporter_id,
-            newTicket.owner_id, newTicket.type, newTicket.category_id, newTicket.subtype, newTicket.status,
+            newTicket.owner_id, newTicket.type, newTicket.category_id, newTicket.subtype, newTicket.status_id,
             newTicket.details, finalPayload, newTicket.priority,
             newTicket.category, finalSheetData, newTicket.ticket_type_id, newTicket.title
         ];
@@ -68,17 +68,19 @@ class Ticket {
                 t.*, 
                 u.email, 
                 tt.type as ticket_type,
+                ts.status_name as status,
                 TO_CHAR(t.created_at, 'DD-MM-YYYY HH24:MI') as "creationDate"
             FROM tickets t
             LEFT JOIN users u ON t.reporter_id = u.id
             LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.id
+            LEFT JOIN ticket_statuses ts ON t.status_id = ts.id
         `;
         let vals = [];
         let clauses = [];
 
         if (filters) {
             if (filters.status) {
-                clauses.push(`t.status = $${vals.length + 1}`);
+                clauses.push(`ts.status_name = $${vals.length + 1}`);
                 vals.push(filters.status);
             }
             if (filters.type) {
@@ -102,27 +104,51 @@ class Ticket {
     }
 
     static async findById(id) {
-        const ticket = await TicketRepo.findById(id);
+        const query = `
+            SELECT 
+                t.*, 
+                u.email, 
+                tt.type as ticket_type,
+                ts.status_name as status,
+                TO_CHAR(t.created_at, 'DD-MM-YYYY HH24:MI') as "creationDate"
+            FROM tickets t
+            LEFT JOIN users u ON t.reporter_id = u.id
+            LEFT JOIN ticket_types tt ON t.ticket_type_id = tt.id
+            LEFT JOIN ticket_statuses ts ON t.status_id = ts.id
+            WHERE t.id = $1
+        `;
+        const result = await pool.query(query, [id]);
+        const ticket = result.rows[0];
+
         if (ticket) {
-            const result = await pool.query('SELECT * FROM replies WHERE ticket_id = $1 ORDER BY created_at ASC', [id]);
-            ticket.replies = result.rows;
+            const repliesRes = await pool.query('SELECT * FROM replies WHERE ticket_id = $1 ORDER BY created_at ASC', [id]);
+            ticket.replies = repliesRes.rows;
         }
         return ticket;
     }
 
-    static async updateStatus(id, newStatus, agent = 'Admin') {
-        const ticket = await TicketRepo.update(id, { status: newStatus });
-        if (ticket) {
+    static async updateStatus(id, newStatusName, agent = 'Admin') {
+        const statusRes = await pool.query('SELECT id FROM ticket_statuses WHERE status_name = $1', [newStatusName]);
+        const status_id = statusRes.rows[0]?.id;
+
+        if (!status_id) {
+            throw new Error(`Status '${newStatusName}' not found`);
+        }
+
+        const updated = await TicketRepo.update(id, { status_id });
+        if (updated) {
             await LogRepo.insert({
                 id: uuidv4(),
                 ticket_id: id,
                 action: 'STATUS_CHANGED',
-                details: `Estado cambiado a ${newStatus}`,
+                details: `Estado cambiado a ${newStatusName}`,
                 agent,
                 created_at: new Date().toISOString()
             });
+            // Return full joined object
+            return await this.findById(id);
         }
-        return ticket;
+        return null;
     }
 
     static async addReply(id, replyData) {
@@ -170,7 +196,7 @@ class Ticket {
         const queries = {
             total: 'SELECT COUNT(*) FROM tickets',
             today: "SELECT COUNT(*) FROM tickets WHERE created_at >= CURRENT_DATE",
-            byStatus: 'SELECT status, COUNT(*) FROM tickets GROUP BY status',
+            byStatus: 'SELECT ts.status_name as status, COUNT(*) FROM tickets t JOIN ticket_statuses ts ON t.status_id = ts.id GROUP BY ts.status_name',
             byCategory: 'SELECT category, COUNT(*) FROM tickets GROUP BY category',
             surveys: 'SELECT AVG(score) as avg_score, COUNT(*) as total_responses FROM surveys'
         };
@@ -195,13 +221,14 @@ class Ticket {
         // Daily volume
         const dailySql = `
             SELECT 
-                TO_CHAR(created_at, 'DD/MM') as date, 
+                TO_CHAR(t.created_at, 'DD/MM') as date, 
                 COUNT(*) as recibidos,
-                COUNT(*) FILTER (WHERE status = 'resuelto') as resueltos
-            FROM tickets
-            WHERE created_at >= NOW() - INTERVAL '${days} days'
-            GROUP BY TO_CHAR(created_at, 'DD/MM'), date
-            ORDER BY MIN(created_at) ASC
+                COUNT(*) FILTER (WHERE ts.status_name = 'resuelto') as resueltos
+            FROM tickets t
+            LEFT JOIN ticket_statuses ts ON t.status_id = ts.id
+            WHERE t.created_at >= NOW() - INTERVAL '${days} days'
+            GROUP BY TO_CHAR(t.created_at, 'DD/MM'), date
+            ORDER BY MIN(t.created_at) ASC
         `;
 
         // Categorical breakdown
