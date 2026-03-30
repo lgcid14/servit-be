@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ticketController = require('../controllers/ticketController');
+const { verifyToken, checkRole } = require('../middlewares/authMiddleware');
 
 // Get all tickets (with optional filters)
 router.get('/', ticketController.getTickets);
@@ -24,10 +25,10 @@ router.get('/:id', ticketController.getTicketById);
 router.post('/', ticketController.createTicket);
 
 // Update ticket status
-router.patch('/:id/status', ticketController.updateTicketStatus);
+router.patch('/:id/status', verifyToken, checkRole(1), ticketController.updateTicketStatus);
 
 // Update ticket (general)
-router.patch('/:id', ticketController.updateTicket);
+router.patch('/:id', verifyToken, checkRole(1), ticketController.updateTicket);
 
 // Generate AI Reply Suggestion via n8n
 router.post('/:id/ai-suggest', ticketController.generateAiSuggestion);
